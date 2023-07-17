@@ -1,0 +1,113 @@
+
+USE DATABASE WORKFORCE_DATA_ANALYTICS;
+USE SCHEMA PUBLIC;
+
+
+// First_Value //
+-- It displays the highest value under each partition
+
+SELECT *,
+       FIRST_VALUE(NUM_EMPLOYEES) OVER (PARTITION BY COMPANY ORDER BY NUM_EMPLOYEES DESC ) AS HIGHEST_LAYOFF
+FROM REVELIO_LAYOFFS;
+
+SELECT *,
+       FIRST_VALUE(CITY) OVER (PARTITION BY COMPANY ORDER BY NUM_EMPLOYEES DESC ) AS MAX_LAIDOFF_CITY
+FROM REVELIO_LAYOFFS;
+
+
+// Last_Value //
+-- It displays the lowest value under each partition
+
+SELECT *,
+       LAST_VALUE(NUM_EMPLOYEES) OVER (PARTITION BY COMPANY ORDER BY NUM_EMPLOYEES DESC ) AS LOWEST_LAYOFF
+FROM REVELIO_LAYOFFS;
+
+
+// Frame Clause //
+-- It is not a specific function of the Window but it solves particular type of problem while using First_Value and the Last_Value together.
+
+SELECT *,
+       FIRST_VALUE(CITY) OVER (PARTITION BY COMPANY ORDER BY NUM_EMPLOYEES DESC ) AS HIGHEST_LAIDOFF_CITY,
+       LAST_VALUE(CITY) OVER (PARTITION BY COMPANY ORDER BY NUM_EMPLOYEES DESC ) AS LOWEST_LAIDOFF_CITY
+FROM REVELIO_LAYOFFS
+WHERE CITY IS NOT NULL;
+
+/*
+ Sometimes when we query First_Value and Last_Value together then our our query does good for First_Value but not for
+ Last_Value
+ */
+
+ SELECT *,
+        FIRST_VALUE(CITY)
+            OVER (PARTITION BY COMPANY ORDER BY NUM_EMPLOYEES DESC ) AS HIGHEST_LAIDOFF_CITY,
+        LAST_VALUE(CITY)
+            OVER (PARTITION BY COMPANY ORDER BY NUM_EMPLOYEES DESC
+                RANGE BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS LOWEST_LAIDOFF_CITY
+ FROM REVELIO_LAYOFFS
+ WHERE CITY IS NOT NULL;
+
+
+// NTH_VALUE //
+-- It shows the Nth value you ask for. In below example we queried 2nd,3rd top most laidoff city
+SELECT *,
+       NTH_VALUE(CITY, 2) OVER (PARTITION BY COMPANY ORDER BY NUM_EMPLOYEES DESC ) AS SECOND_MOST_LAIDOFFCITY,
+       NTH_VALUE(CITY, 3) OVER (PARTITION BY COMPANY ORDER BY NUM_EMPLOYEES DESC ) AS THIRD_MOST_LAIDOFFCITY
+FROM REVELIO_LAYOFFS;
+
+
+// N-TILE //
+-- It creates buckets of values under a partition
+
+SELECT *,
+       NTILE(3) OVER (ORDER BY NUM_EMPLOYEES DESC ) AS LAYOFF_EMP_BUCKET
+FROM REVELIO_LAYOFFS
+WHERE COMPANY = 'Exide Technologies, Inc.';
+
+-- Segregate cities on the basis of layoffs for Exide Technologies
+SELECT COMPANY,
+       CITY,
+       NUM_EMPLOYEES,
+       CASE WHEN x.LAYOFF_EMP_BUCKET = 1 THEN 'MOST LAYOFF CITY'
+            WHEN x.LAYOFF_EMP_BUCKET = 2 THEN 'SECOND MOST LAYOFF CITY'
+            WHEN x.LAYOFF_EMP_BUCKET = 3 THEN 'LEAST LAYOFF CITY' END AS LAYOFF_BUCKET
+FROM (
+    SELECT *,
+    NTILE(3) OVER (ORDER BY NUM_EMPLOYEES DESC ) AS LAYOFF_EMP_BUCKET
+    FROM REVELIO_LAYOFFS
+    WHERE COMPANY = 'Exide Technologies, Inc.'
+     ) x;
+
+
+// CUME_DIST //
+-- Returns the cumulative distribution within a specified group of values.
+-- The values varies from 0 to 1.
+-- It calculates the cumulative position of each value in a group of values.
+
+SELECT *,
+       CUME_DIST() OVER (ORDER BY NUM_EMPLOYEES DESC ) AS LAYOFF_DISTRIBUTION,
+       ROUND(CUME_DIST() OVER (ORDER BY NUM_EMPLOYEES DESC )* 100, 2) AS LAYOFF_RATE_DIST
+FROM REVELIO_LAYOFFS
+WHERE NUM_EMPLOYEES IS NOT NULL;
+
+
+SELECT COMPANY,
+       NUM_EMPLOYEES,
+       LAYOFF_RATE_DIST||'%' AS LAYOFF_DIST_RATE
+FROM(
+    SELECT *,
+           CUME_DIST() OVER (ORDER BY NUM_EMPLOYEES DESC ) AS LAYOFF_DISTRIBUTION,
+           ROUND(CUME_DIST() OVER (ORDER BY NUM_EMPLOYEES DESC )* 100, 2) AS LAYOFF_RATE_DIST
+    FROM REVELIO_LAYOFFS
+    WHERE NUM_EMPLOYEES IS NOT NULL) x;
+
+
+// PERCENT_RANK
+-- It calculates the relative rank percentile of each row.
+-- It always returns values greater than 0, and the highest value is 1.
+-- It does not count any NULL values.
+
+SELECT *,
+       PERCENT_RANK() OVER (ORDER BY NUM_EMPLOYEES DESC ) AS PERCENTILE,
+       ROUND(PERCENT_RANK() OVER (ORDER BY NUM_EMPLOYEES DESC )*100, 2) AS PER_RANK
+FROM REVELIO_LAYOFFS
+WHERE NUM_EMPLOYEES IS NOT NULL ;
